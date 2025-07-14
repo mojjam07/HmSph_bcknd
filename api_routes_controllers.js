@@ -19,9 +19,15 @@ const app = express();
 
 // Connect to PostgreSQL
 sequelize.authenticate()
-  .then(() => console.log('Connected to PostgreSQL'))
+  .then(() => {
+    console.log('Connected to PostgreSQL');
+    return sequelize.sync({ alter: true });
+  })
+  .then(() => {
+    console.log('Database synchronized');
+  })
   .catch((err) => {
-    console.error('Failed to connect to PostgreSQL', err);
+    console.error('Failed to connect to PostgreSQL or sync database', err);
     process.exit(1);
   });
 

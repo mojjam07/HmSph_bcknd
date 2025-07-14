@@ -9,7 +9,7 @@ class User extends Model {
 }
 
 User.init({
-  userId: {
+userId: {
     type: DataTypes.STRING,
     allowNull: false,
     unique: true,
@@ -69,6 +69,7 @@ User.init({
   sequelize,
   modelName: 'User',
   timestamps: true,
+  id: false,
   hooks: {
     beforeCreate: async (user) => {
       if (user.password) {
@@ -90,7 +91,7 @@ class Agent extends Model {
 }
 
 Agent.init({
-  agentId: {
+agentId: {
     type: DataTypes.STRING,
     allowNull: false,
     unique: true,
@@ -175,6 +176,7 @@ Agent.init({
   sequelize,
   modelName: 'Agent',
   timestamps: true,
+  id: false,
   hooks: {
     beforeCreate: async (agent) => {
       if (agent.password) {
@@ -484,6 +486,59 @@ Report.init({
   timestamps: true
 });
 
+class Admin extends Model {}
+
+Admin.init({
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  email: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
+    set(value) {
+      this.setDataValue('email', value.toLowerCase());
+    },
+    validate: {
+      isEmail: true
+    }
+  },
+  password: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  firstName: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  lastName: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  role: {
+    type: DataTypes.STRING,
+    defaultValue: 'admin'
+  }
+}, {
+  sequelize,
+  modelName: 'Admin',
+  timestamps: true,
+  hooks: {
+    beforeCreate: async (admin) => {
+      if (admin.password) {
+        admin.password = await bcrypt.hash(admin.password, 12);
+      }
+    },
+    beforeUpdate: async (admin) => {
+      if (admin.changed('password')) {
+        admin.password = await bcrypt.hash(admin.password, 12);
+      }
+    }
+  }
+});
+
 module.exports = {
   User,
   Agent,
@@ -491,5 +546,6 @@ module.exports = {
   Lead,
   Review,
   Payment,
-  Report
+  Report,
+  Admin
 };

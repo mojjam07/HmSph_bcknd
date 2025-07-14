@@ -19,20 +19,21 @@ const registerUser = async (req, res, next) => {
     }
 
     // Create new user
-    const user = new User({ email, phone, firstName, lastName, password });
-    await user.save();
+    const user = await User.create({ email, phone, firstName, lastName, password });
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user.id, role: 'user' },
+      { userId: user.userId, role: 'user' },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
+    console.log('Generated token:', token);
+
     res.status(201).json({
       message: 'User registered successfully',
       token,
-      user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: 'user' }
+      user: { id: user.userId, email: user.email, firstName: user.firstName, lastName: user.lastName, role: 'user' }
     });
   } catch (error) {
     next(error); // Pass error to the error handling middleware
@@ -53,11 +54,10 @@ const registerAgent = async (req, res, next) => {
       return res.status(400).json({ error: 'Agent already exists with this email or phone' });
     }
 
-    const agent = new Agent({ email, phone, firstName, lastName, password, businessName });
-    await agent.save();
+    const agent = await Agent.create({ email, phone, firstName, lastName, password, businessName });
 
     const token = jwt.sign(
-      { userId: agent.id, role: 'agent' },
+      { userId: agent.agentId, role: 'agent' },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -65,7 +65,7 @@ const registerAgent = async (req, res, next) => {
     res.status(201).json({
       message: 'Agent registered successfully',
       token,
-      agent: { id: agent.id, email: agent.email, firstName: agent.firstName, lastName: agent.lastName, businessName: agent.businessName, role: 'agent' }
+      agent: { id: agent.agentId, email: agent.email, firstName: agent.firstName, lastName: agent.lastName, businessName: agent.businessName, role: 'agent' }
     });
   } catch (error) {
     next(error);
@@ -77,7 +77,13 @@ const login = async (req, res, next) => {
   try {
     const { email, phone, password } = req.body;
 
-    let user = await User.findOne({
+    if (!email && !phone) {
+      return res.status(400).json({ error: 'Email or phone must be provided' });
+    }
+
+    const phoneString = phone ? String(phone) : null; // Convert phone to string if it exists
+
+    let user = await User.findOne({  
       where: {
         [Op.or]: [{ email }, { phone }]
       }
@@ -100,12 +106,12 @@ const login = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid password' });
     }
 
-    const token = jwt.sign({ userId: user.id, role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: role === 'user' ? user.userId : user.agentId, role }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     res.status(200).json({
       message: 'Login successful',
       token,
-      user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role }
+      user: { id: role === 'user' ? user.userId : user.agentId, email: user.email, firstName: user.firstName, lastName: user.lastName, role }
     });
   } catch (error) {
     next(error);
@@ -116,7 +122,7 @@ const login = async (req, res, next) => {
 const getProfile = async (req, res, next) => {
   try {
     const Model = req.user.role === 'user' ? User : Agent;
-    const user = await Model.findById(req.user.userId).select('-password');
+    const user = await Model.findByPk(req.user.id, { attributes: { exclude: ['password'] } });
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
   } catch (error) {

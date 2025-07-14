@@ -6,7 +6,9 @@ export async function registerUser(userData) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(userData)
   });
-  return response.json();
+  const jsonResponse = await response.json();
+  console.log('Raw registerUser response:', jsonResponse);
+  return jsonResponse;
 }
 
 export async function registerAgent(agentData) {

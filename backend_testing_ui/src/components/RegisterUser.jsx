@@ -23,7 +23,8 @@ export default function RegisterUser() {
       if (result.error) {
         setMessage('Error: ' + result.error);
       } else {
-        setMessage('User registered successfully. Token: ' + result.token);
+        setMessage('User registered successfully.');
+        // Optionally, handle the token securely here, e.g., store in localStorage or context
       }
     } catch (err) {
       setMessage('Registration failed.');
