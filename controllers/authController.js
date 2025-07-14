@@ -21,14 +21,14 @@ const registerUser = async (req, res, next) => {
     // Create new user
     const user = await User.create({ email, phone, firstName, lastName, password });
 
-    // Generate JWT token
+    // Generate JWT token with consistent field naming
     const token = jwt.sign(
-      { userId: user.userId, role: 'user' },
+      { id: user.userId, role: 'user' },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    console.log('Generated token:', token);
+    // console.log('Generated token:', token);
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -56,8 +56,9 @@ const registerAgent = async (req, res, next) => {
 
     const agent = await Agent.create({ email, phone, firstName, lastName, password, businessName });
 
+    // Generate JWT token with consistent field naming
     const token = jwt.sign(
-      { userId: agent.agentId, role: 'agent' },
+      { id: agent.agentId, role: 'agent' },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -81,22 +82,29 @@ const login = async (req, res, next) => {
       return res.status(400).json({ error: 'Email or phone must be provided' });
     }
 
-    const phoneString = phone ? String(phone) : null; // Convert phone to string if it exists
+    // Build dynamic conditions array for email and phone
+    const conditions = [];
+    if (email) conditions.push({ email });
+    if (phone) conditions.push({ phone });
 
-    let user = await User.findOne({  
+    // Check Agent first
+    let user = await Agent.findOne({
       where: {
-        [Op.or]: [{ email }, { phone }]
+        [Op.or]: conditions
       }
     });
-    let role = 'user';
+    let role = 'agent';
+
+    // If not found in Agent, check User
     if (!user) {
-      user = await Agent.findOne({
+      user = await User.findOne({
         where: {
-          [Op.or]: [{ email }, { phone }]
+          [Op.or]: conditions
         }
       });
-      role = 'agent';
+      role = 'user';
     }
+
     if (!user) {
       return res.status(400).json({ error: 'User or agent not found' });
     }
@@ -106,12 +114,28 @@ const login = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid password' });
     }
 
-    const token = jwt.sign({ userId: role === 'user' ? user.userId : user.agentId, role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    // Use consistent id field in token payload
+    const id = role === 'user' ? user.userId : user.agentId;
+    const token = jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    // Build response user object with additional fields for agents
+    const responseUser = {
+      id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role
+    };
+
+    // Add businessName for agents
+    if (role === 'agent') {
+      responseUser.businessName = user.businessName;
+    }
 
     res.status(200).json({
       message: 'Login successful',
       token,
-      user: { id: role === 'user' ? user.userId : user.agentId, email: user.email, firstName: user.firstName, lastName: user.lastName, role }
+      user: responseUser
     });
   } catch (error) {
     next(error);
@@ -121,11 +145,26 @@ const login = async (req, res, next) => {
 // Get Profile
 const getProfile = async (req, res, next) => {
   try {
-    const Model = req.user.role === 'user' ? User : Agent;
-    const user = await Model.findByPk(req.user.id, { attributes: { exclude: ['password'] } });
+    // console.log('Decoded token payload:', req.user);
+    
+    let user;
+    if (req.user.role === 'user') {
+      user = await User.findOne({ 
+        where: { userId: req.user.id }, 
+        attributes: { exclude: ['password'] } 
+      });
+    } else if (req.user.role === 'agent') {
+      user = await Agent.findOne({ 
+        where: { agentId: req.user.id }, 
+        attributes: { exclude: ['password'] } 
+      });
+    }
+    
+    // console.log('User found:', user);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
+    res.json({ ...user.toJSON(), role: req.user.role });
   } catch (error) {
+    // console.error('Error in getProfile:', error);
     next(error);
   }
 };
