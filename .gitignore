@@ -3,6 +3,8 @@ config/db.js
 
 node_modules/
 
+UI_Backend_Interaction_Explanation.txt
+
 *.log
 
 .env

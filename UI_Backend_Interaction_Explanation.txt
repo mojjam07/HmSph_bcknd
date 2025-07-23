@@ -1,36 +1,5 @@
-UI and Backend Interaction Explanation
+# For Improvement #
 
-1. Overview of Backend Data Structure:
-The backend uses Sequelize ORM to define several key models representing the core entities of the system:
-
-- User: Represents end-users with fields like userId, email, phone, name, password (hashed), profile picture, preferences, saved listings, search history, notifications, and login timestamps.
-- Agent: Represents agents with additional business-related fields such as businessName, licenseNumber, subscription plans, verification status, and metrics.
-- Listing: Represents property listings posted by agents, including details like title, description, property type, location, price, features, media (images/videos), status, promotion flags, and verification.
-- Lead: Represents potential customer leads linked to listings, agents, and users, with contact methods and status tracking.
-- Review: Represents user reviews for agents and listings, including ratings, comments, categories, and approval status.
-- Payment: Represents payment transactions related to subscriptions, promotions, verifications, and boosts.
-- Report: Represents reports made by users about listings, including reasons, status, and administrative notes.
-
-2. Authentication and User Management API Endpoints:
-The backend exposes RESTful API endpoints for user and agent registration, login, and profile retrieval:
-
-- POST /register/user: Registers a new user by accepting email, phone, name, and password. Passwords are hashed before storage. Returns a JWT token and user info on success.
-- POST /register/agent: Registers a new agent with additional business details. Also returns a JWT token and agent info.
-- POST /login: Authenticates a user or agent using email or phone and password. Returns a JWT token and user/agent info on success.
-- GET /profile: Retrieves the profile of the authenticated user or agent. Requires a valid JWT token.
-
-3. How the UI Interacts with the Backend:
-- Registration: The UI collects user or agent details via forms and sends POST requests to the respective registration endpoints. On success, the UI stores the returned JWT token for authenticated requests.
-- Login: The UI sends login credentials to the login endpoint. Upon successful authentication, the JWT token is stored and used for subsequent requests.
-- Profile Access: The UI includes the JWT token in the Authorization header to fetch the user's profile data.
-- Other Data Interactions: Although not detailed here, the UI would interact with other backend endpoints (e.g., listings, leads, reviews) similarly by sending HTTP requests to the appropriate routes, passing authentication tokens as needed, and handling responses to update the UI state.
-
-4. Typical UI-Backend Interaction Flow:
-- User opens the app and registers or logs in.
-- The UI stores the JWT token securely (e.g., in memory or secure storage).
-- The UI uses the token to access protected resources like profile data.
-- The UI sends requests to create, read, update, or delete data entities (listings, leads, reviews, etc.) as per user actions.
-- The backend validates requests, performs database operations, and returns responses.
-- The UI updates the interface based on backend responses, providing feedback to the user.
-
-This explanation provides a high-level understanding of how the UI communicates with the backend data structure through API endpoints, enabling user authentication, data management, and interaction within the application.
+User: General users who can register, login, view profile, save listings, search, etc.
+Agent: Real estate agents who can register, login, manage listings, have subscriptions, and profile management.
+Admin: Admin users with elevated privileges, likely managing reports, payments, and overall system, but not exposed in these auth routes.
