@@ -14,6 +14,7 @@ const { sequelize } = require('./config/db'); // Import Sequelize instance
 
 // Route Imports
 const authRoutes = require('./routes/authRoutes');
+const listingRoutes = require('./routes/listingRoutes');
 
 const app = express();
 
@@ -74,7 +75,7 @@ const upload = multer({ storage: storage });
 
 // ==================== API ROUTES ====================
 app.use('/api/auth', authRoutes);
-// You can add other route modules here, e.g., app.use('/api/listings', listingRoutes);
+app.use('/api/listings', listingRoutes);
 
 // ==================== ERROR HANDLING ====================
 app.use((err, req, res, next) => {

@@ -39,3 +39,13 @@ export async function getProfile(token) {
   });
   return response.json();
 }
+
+export async function getListings() {
+  const response = await fetch(`${API_BASE_URL}/api/listings`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+  return response.json();
+}

@@ -18,6 +18,21 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// Authorization middleware for admin roles and permissions
+const authorizeAdmin = (allowedRoles = []) => {
+  return (req, res, next) => {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    // Check roleType if provided
+    if (allowedRoles.length > 0 && !allowedRoles.includes(req.user.roleType)) {
+      return res.status(403).json({ error: 'Insufficient admin privileges' });
+    }
+    next();
+  };
+};
+
 module.exports = {
-  authenticateToken
+  authenticateToken,
+  authorizeAdmin
 };

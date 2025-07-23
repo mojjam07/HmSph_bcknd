@@ -4,11 +4,13 @@ import RegisterUser from './components/RegisterUser';
 import RegisterAgent from './components/RegisterAgent';
 import Login from './components/Login';
 import Profile from './components/Profile';
+import LandingPage from './components/LandingPage';
+// import { useState } from 'react';
 
 function App() {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
-  const [view, setView] = useState('login'); // 'login', 'registerUser', 'registerAgent', 'profile'
+  const [view, setView] = useState('landing'); // default to landing page
 
   const handleLogin = (token, user) => {
     setToken(token);
@@ -19,7 +21,7 @@ function App() {
   const handleLogout = () => {
     setToken(null);
     setUser(null);
-    setView('login');
+    setView('landing');
   };
 
   return (
@@ -41,6 +43,7 @@ function App() {
       </nav>
 
       <main>
+        {view === 'landing' && <LandingPage onNavigate={setView} />}
         {view === 'login' && <Login onLogin={handleLogin} />}
         {view === 'registerUser' && <RegisterUser />}
         {view === 'registerAgent' && <RegisterAgent />}

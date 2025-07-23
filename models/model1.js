@@ -520,6 +520,14 @@ Admin.init({
   role: {
     type: DataTypes.STRING,
     defaultValue: 'admin'
+  },
+  roleType: {
+    type: DataTypes.ENUM('superadmin', 'admin', 'moderator'),
+    defaultValue: 'admin'
+  },
+  permissions: {
+    type: DataTypes.JSONB,
+    defaultValue: {}
   }
 }, {
   sequelize,
