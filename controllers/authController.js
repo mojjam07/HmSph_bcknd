@@ -1,4 +1,4 @@
-const { User, Agent } = require('../models/model1.js');
+const { User, Agent, Admin } = require('../models/model1.js');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { Op } = require('sequelize');
@@ -18,8 +18,11 @@ const registerUser = async (req, res, next) => {
       return res.status(400).json({ error: 'User already exists with this email or phone' });
     }
 
-    // Create new user
-    const user = await User.create({ email, phone, firstName, lastName, password });
+    // Hash password before saving
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // Create new user with hashed password
+    const user = await User.create({ email, phone, firstName, lastName, password: hashedPassword });
 
     // Generate JWT token with consistent field naming
     const token = jwt.sign(
@@ -27,8 +30,6 @@ const registerUser = async (req, res, next) => {
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
-
-    // console.log('Generated token:', token);
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -54,7 +55,10 @@ const registerAgent = async (req, res, next) => {
       return res.status(400).json({ error: 'Agent already exists with this email or phone' });
     }
 
-    const agent = await Agent.create({ email, phone, firstName, lastName, password, businessName });
+    // Hash password before saving
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const agent = await Agent.create({ email, phone, firstName, lastName, password: hashedPassword, businessName });
 
     // Generate JWT token with consistent field naming
     const token = jwt.sign(
@@ -76,10 +80,15 @@ const registerAgent = async (req, res, next) => {
 // Login
 const login = async (req, res, next) => {
   try {
-    const { email, phone, password } = req.body;
+    let { email, phone, password } = req.body;
 
     if (!email && !phone) {
       return res.status(400).json({ error: 'Email or phone must be provided' });
+    }
+
+    // Lowercase email if provided
+    if (email) {
+      email = email.toLowerCase();
     }
 
     // Build dynamic conditions array for email and phone
@@ -87,13 +96,33 @@ const login = async (req, res, next) => {
     if (email) conditions.push({ email });
     if (phone) conditions.push({ phone });
 
-    // Check Agent first
-    let user = await Agent.findOne({
-      where: {
-        [Op.or]: conditions
-      }
-    });
-    let role = 'agent';
+    // Check Admin first by email only (Admin model has no phone)
+    let user = null;
+    if (email) {
+      user = await Admin.findOne({
+        where: { email }
+      });
+    }
+
+    // If not found in Admin, check Agent
+    if (!user) {
+      user = await Agent.findOne({
+        where: {
+          [Op.or]: conditions
+        }
+      });
+    }
+    let role = 'admin';
+
+    // If not found in Admin, check Agent
+    if (!user) {
+      user = await Agent.findOne({
+        where: {
+          [Op.or]: conditions
+        }
+      });
+      role = 'agent';
+    }
 
     // If not found in Agent, check User
     if (!user) {
@@ -106,19 +135,25 @@ const login = async (req, res, next) => {
     }
 
     if (!user) {
-      return res.status(400).json({ error: 'User or agent not found' });
+      return res.status(400).json({ error: 'User, agent or admin not found' });
     }
 
+    console.log('Stored hashed password:', user.password);
     const validPassword = await bcrypt.compare(password, user.password);
+    console.log('Password valid:', validPassword);
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid password' });
     }
 
     // Use consistent id field in token payload
-    const id = role === 'user' ? user.userId : user.agentId;
+    let id;
+    if (role === 'user') id = user.userId;
+    else if (role === 'agent') id = user.agentId;
+    else id = user.id;
+
     const token = jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
-    // Build response user object with additional fields for agents
+    // Build response user object with additional fields for agents and admins
     const responseUser = {
       id,
       email: user.email,
@@ -145,7 +180,7 @@ const login = async (req, res, next) => {
 // Get Profile
 const getProfile = async (req, res, next) => {
   try {
-    // console.log('Decoded token payload:', req.user);
+    console.log('Decoded token payload:', req.user);
     
     let user;
     if (req.user.role === 'user') {
@@ -158,13 +193,18 @@ const getProfile = async (req, res, next) => {
         where: { agentId: req.user.id }, 
         attributes: { exclude: ['password'] } 
       });
+    } else if (req.user.role === 'admin') {
+      user = await Admin.findOne({
+        where: { id: req.user.id },
+        attributes: { exclude: ['password'] }
+      });
     }
     
-    // console.log('User found:', user);
+    console.log('User found:', user);
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ ...user.toJSON(), role: req.user.role });
   } catch (error) {
-    // console.error('Error in getProfile:', error);
+    console.error('Error in getProfile:', error);
     next(error);
   }
 };

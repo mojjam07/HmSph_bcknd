@@ -25,25 +25,25 @@ export default function Profile({ token }) {
   }, [token]);
 
   if (!token) {
-    return <p>Please log in to view profile.</p>;
+    return <p className="profile-message">Please log in to view profile.</p>;
   }
 
   if (message) {
-    return <p>{message}</p>;
+    return <p className="profile-message">{message}</p>;
   }
 
   if (!profile) {
-    return <p>Loading profile...</p>;
+    return <p className="profile-message">Loading profile...</p>;
   }
 
   return (
-    <div>
-      <h2>Profile</h2>
-      <p><strong>Email:</strong> {profile.email}</p>
-      <p><strong>First Name:</strong> {profile.firstName}</p>
-      <p><strong>Last Name:</strong> {profile.lastName}</p>
-      {profile.businessName && <p><strong>Business Name:</strong> {profile.businessName}</p>}
-      <p><strong>Role:</strong> {profile.role || 'user'}</p>
+    <div className="profile-container">
+      <h2 className="profile-title">Profile</h2>
+      <p className="profile-item"><strong>Email:</strong> {profile.email}</p>
+      <p className="profile-item"><strong>First Name:</strong> {profile.firstName}</p>
+      <p className="profile-item"><strong>Last Name:</strong> {profile.lastName}</p>
+      {profile.businessName && <p className="profile-item"><strong>Business Name:</strong> {profile.businessName}</p>}
+      <p className="profile-item"><strong>Role:</strong> {profile.role || 'user'}</p>
     </div>
   );
 }

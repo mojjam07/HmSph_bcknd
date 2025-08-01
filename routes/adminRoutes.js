@@ -1,5 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const { authenticateToken, authorizeAdmin } = require('../middleware/authMiddleware');
+
+// Apply authentication and admin authorization middleware to all routes
+router.use(authenticateToken);
+router.use(authorizeAdmin());
 
 // Admin Dashboard route
 router.get('/dashboard', (req, res) => {
