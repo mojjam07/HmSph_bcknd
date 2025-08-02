@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { registerAgent } from '../api';
+import Input from './common/Input';
+import Button from './common/Button';
 
 export default function RegisterAgent() {
   const [formData, setFormData] = useState({
@@ -32,18 +34,72 @@ export default function RegisterAgent() {
   };
 
   return (
-    <div>
-      <h2>Agent Registration</h2>
+    <div className="max-w-md mx-auto mt-10 p-8 bg-gradient-to-r from-purple-500 via-pink-600 to-red-500 rounded-xl shadow-lg text-white">
+      <h2 className="text-3xl font-bold mb-8 text-center drop-shadow-lg">Agent Registration</h2>
       <form onSubmit={handleSubmit}>
-        <input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleChange} required />
-        <input name="phone" type="text" placeholder="Phone" value={formData.phone} onChange={handleChange} required />
-        <input name="firstName" type="text" placeholder="First Name" value={formData.firstName} onChange={handleChange} required />
-        <input name="lastName" type="text" placeholder="Last Name" value={formData.lastName} onChange={handleChange} required />
-        <input name="businessName" type="text" placeholder="Business Name" value={formData.businessName} onChange={handleChange} required />
-        <input name="password" type="password" placeholder="Password" value={formData.password} onChange={handleChange} required />
-        <button type="submit">Register Agent</button>
+        <Input
+          label="Email"
+          name="email"
+          type="email"
+          placeholder="Enter your email"
+          value={formData.email}
+          onChange={handleChange}
+          required
+          className="bg-white text-gray-900 placeholder-gray-400"
+        />
+        <Input
+          label="Phone"
+          name="phone"
+          type="text"
+          placeholder="Enter your phone number"
+          value={formData.phone}
+          onChange={handleChange}
+          required
+          className="bg-white text-gray-900 placeholder-gray-400"
+        />
+        <Input
+          label="First Name"
+          name="firstName"
+          type="text"
+          placeholder="Enter your first name"
+          value={formData.firstName}
+          onChange={handleChange}
+          required
+          className="bg-white text-gray-900 placeholder-gray-400"
+        />
+        <Input
+          label="Last Name"
+          name="lastName"
+          type="text"
+          placeholder="Enter your last name"
+          value={formData.lastName}
+          onChange={handleChange}
+          required
+          className="bg-white text-gray-900 placeholder-gray-400"
+        />
+        <Input
+          label="Business Name"
+          name="businessName"
+          type="text"
+          placeholder="Enter your business name"
+          value={formData.businessName}
+          onChange={handleChange}
+          required
+          className="bg-white text-gray-900 placeholder-gray-400"
+        />
+        <Input
+          label="Password"
+          name="password"
+          type="password"
+          placeholder="Enter your password"
+          value={formData.password}
+          onChange={handleChange}
+          required
+          className="bg-white text-gray-900 placeholder-gray-400"
+        />
+        <Button type="submit" className="w-full mt-6 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold shadow-md">Register Agent</Button>
       </form>
-      {message && <p>{message}</p>}
+      {message && <p className="mt-4 text-center text-yellow-200 font-semibold drop-shadow-md">{message}</p>}
     </div>
   );
 }
