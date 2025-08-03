@@ -10,13 +10,13 @@ import NewsletterSection from './LandingPage/NewsletterSection';
 import RegistrationForm from './auth/RegistrationForm';
 import Login from './Login';
 
-const LandingPage = ({ onLogin, token, user }) => {
+const LandingPage = ({ onLogin, token, user, initialFilters = { priceRange: 'all', propertyType: 'all', searchQuery: '' } }) => {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPropertyType, setSelectedPropertyType] = useState('all');
-  const [priceRange, setPriceRange] = useState('all');
+  const [searchQuery, setSearchQuery] = useState(initialFilters.searchQuery || '');
+  const [selectedPropertyType, setSelectedPropertyType] = useState(initialFilters.propertyType || 'all');
+  const [priceRange, setPriceRange] = useState(initialFilters.priceRange || 'all');
   const [favorites, setFavorites] = useState(new Set());
   const [showRegistration, setShowRegistration] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
