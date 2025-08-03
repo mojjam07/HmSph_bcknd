@@ -64,6 +64,31 @@ userId: {
   },
   lastLogin: {
     type: DataTypes.DATE
+  },
+  // Role-based fields
+  role: {
+    type: DataTypes.STRING,
+    defaultValue: 'user'
+  },
+  businessName: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  licenseNumber: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  yearsOfExperience: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  department: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  employeeId: {
+    type: DataTypes.STRING,
+    allowNull: true
   }
 }, {
   sequelize,
@@ -171,6 +196,10 @@ agentId: {
   },
   lastLogin: {
     type: DataTypes.DATE
+  },
+  yearsOfExperience: {
+    type: DataTypes.INTEGER,
+    allowNull: true
   }
 }, {
   sequelize,
@@ -528,6 +557,10 @@ Admin.init({
   permissions: {
     type: DataTypes.JSONB,
     defaultValue: {}
+  },
+  employeeId: {
+    type: DataTypes.STRING,
+    allowNull: true
   }
 }, {
   sequelize,

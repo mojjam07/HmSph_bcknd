@@ -1,4 +1,3 @@
-const bcrypt = require('bcrypt');
 const { Admin } = require('../models/model1');
 
 const defaultAdmin = {
@@ -8,7 +7,8 @@ const defaultAdmin = {
   lastName: 'Admin',
   role: 'admin',
   roleType: 'superadmin',
-  permissions: {}
+  permissions: {},
+  employeeId: 'ADMIN001'
 };
 
 async function seedDefaultAdmin() {
@@ -19,10 +19,9 @@ async function seedDefaultAdmin() {
       return;
     }
 
-    const hashedPassword = await bcrypt.hash(defaultAdmin.password, 12);
     await Admin.create({
       email: defaultAdmin.email,
-      password: hashedPassword,
+      password: defaultAdmin.password, // Let model hooks handle password hashing
       firstName: defaultAdmin.firstName,
       lastName: defaultAdmin.lastName,
       role: defaultAdmin.role,
