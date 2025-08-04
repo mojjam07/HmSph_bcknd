@@ -1,5 +1,4 @@
-import { useState } from 'react';
-// import './s.css';
+import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
 import Profile from './components/Profile';
@@ -15,14 +14,29 @@ function App() {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
 
+  useEffect(() => {
+    // Load token and user from localStorage on mount
+    const storedToken = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    if (storedToken && storedUser) {
+      setToken(storedToken);
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
   const handleLogin = (token, user) => {
     setToken(token);
     setUser(user);
+    // Store token and user in localStorage
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
   };
 
   const handleLogout = () => {
     setToken(null);
     setUser(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
   };
 
   // Common props for all pages
