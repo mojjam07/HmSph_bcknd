@@ -3,7 +3,7 @@ import { Search, Filter, RefreshCw } from 'lucide-react';
 import PropertyCard from './PropertyCard';
 import { useProperties } from '../hook/useProperties';
 
-const PropertiesSection = ({ initialFilters = {} }) => {
+const PropertiesSection = ({ initialFilters = {}, token = null }) => {
   const {
     filteredListings,
     loading,
@@ -19,7 +19,7 @@ const PropertiesSection = ({ initialFilters = {} }) => {
     toggleFavorite,
     loadMore,
     retry,
-  } = useProperties(initialFilters);
+  } = useProperties(initialFilters, token);
 
   const handleClearFilters = () => {
     setSearchQuery('');

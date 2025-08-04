@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Navigation from './LandingPage/Navigation';
 import HeroSection from './LandingPage/HeroSection';
 import PropertyCard from './LandingPage/PropertyCard';
@@ -20,6 +20,23 @@ const LandingPage = ({ onLogin, token, user, initialFilters = { priceRange: 'all
   const [favorites, setFavorites] = useState(new Set());
   const [showRegistration, setShowRegistration] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+
+  // Memoized event handlers to prevent stale references
+  const handleShowRegistration = useCallback(() => {
+    setShowRegistration(true);
+  }, []);
+
+  const handleShowLogin = useCallback(() => {
+    setShowLogin(true);
+  }, []);
+
+  const handleCloseRegistration = useCallback(() => {
+    setShowRegistration(false);
+  }, []);
+
+  const handleCloseLogin = useCallback(() => {
+    setShowLogin(false);
+  }, []);
 
   // Sample data for demo - replace with your API call
   useEffect(() => {
@@ -97,6 +114,7 @@ const LandingPage = ({ onLogin, token, user, initialFilters = { priceRange: 'all
         setSearchQuery={setSearchQuery}
         selectedPropertyType={selectedPropertyType}
         setSelectedPropertyType={setSelectedPropertyType}
+        token={token}
       />
       
       <CTASection />
@@ -111,7 +129,7 @@ const LandingPage = ({ onLogin, token, user, initialFilters = { priceRange: 'all
           <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-screen overflow-y-auto">
             <div className="p-4 flex justify-end">
               <button 
-                onClick={() => setShowRegistration(false)}
+                onClick={handleCloseRegistration}
                 className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
               >
                 &times;
@@ -130,7 +148,7 @@ const LandingPage = ({ onLogin, token, user, initialFilters = { priceRange: 'all
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
             <div className="p-4 flex justify-end">
               <button 
-                onClick={() => setShowLogin(false)}
+                onClick={handleCloseLogin}
                 className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
               >
                 &times;

@@ -1,8 +1,8 @@
 // 2. Custom Hook for Properties Data (useProperties.js)
 import { useState, useEffect, useCallback } from 'react';
-import ApiService from '../../api';
+import { propertiesAPI, favoritesAPI } from '../../api';
 
-export const useProperties = (initialFilters = {}) => {
+export const useProperties = (initialFilters = {}, token = null) => {
   const [properties, setProperties] = useState([]);
   const [filteredListings, setFilteredListings] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -32,7 +32,7 @@ export const useProperties = (initialFilters = {}) => {
         limit: 12,
       };
 
-      const response = await ApiService.getProperties(filters);
+      const response = await propertiesAPI.getProperties(filters);
       
       if (append) {
         setProperties(prev => [...prev, ...response.data]);
@@ -40,7 +40,7 @@ export const useProperties = (initialFilters = {}) => {
         setProperties(response.data);
       }
       
-      setHasMore(response.hasMore);
+      setHasMore(response.pagination.hasMore);
       setCurrentPage(page);
     } catch (err) {
       setError(err.message || 'Failed to fetch properties');
@@ -58,16 +58,29 @@ export const useProperties = (initialFilters = {}) => {
 
   // Fetch favorites
   const fetchFavorites = useCallback(async () => {
+    // Only fetch favorites if user is authenticated
+    if (!token) {
+      setFavorites(new Set());
+      return;
+    }
+    
     try {
-      const response = await ApiService.getFavorites();
+      const response = await favoritesAPI.getFavorites();
       setFavorites(new Set(response.data.map(fav => fav.propertyId)));
     } catch (err) {
       console.error('Failed to fetch favorites:', err);
+      setFavorites(new Set()); // Reset favorites on error
     }
-  }, []);
+  }, [token]);
 
   // Toggle favorite
   const toggleFavorite = useCallback(async (propertyId) => {
+    // Only allow toggling favorites if user is authenticated
+    if (!token) {
+      setError('Please log in to save favorites');
+      return;
+    }
+    
     const wasFavorite = favorites.has(propertyId);
     
     // Optimistic update
@@ -83,9 +96,9 @@ export const useProperties = (initialFilters = {}) => {
 
     try {
       if (wasFavorite) {
-        await ApiService.removeFromFavorites(propertyId);
+        await favoritesAPI.removeFromFavorites(propertyId);
       } else {
-        await ApiService.addToFavorites(propertyId);
+        await favoritesAPI.addToFavorites(propertyId);
       }
     } catch (err) {
       // Revert optimistic update on error
@@ -101,7 +114,7 @@ export const useProperties = (initialFilters = {}) => {
       
       setError('Failed to update favorites');
     }
-  }, [favorites]);
+  }, [favorites, token]);
 
   // Apply client-side filtering (if needed)
   useEffect(() => {
@@ -113,7 +126,7 @@ export const useProperties = (initialFilters = {}) => {
     fetchProperties(1, false);
   }, [fetchProperties]);
 
-  // Fetch favorites on mount
+  // Fetch favorites when token changes
   useEffect(() => {
     fetchFavorites();
   }, [fetchFavorites]);

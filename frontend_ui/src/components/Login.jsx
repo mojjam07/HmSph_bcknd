@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login } from '../api';
+import { authAPI } from '../api';
 import Input from './common/Input';
 import Button from './common/Button';
 
@@ -29,7 +29,7 @@ export default function Login({ onLogin }) {
         password: formData.password
       };
       
-      const result = await login(loginData);
+      const result = await authAPI.login(loginData);
       
       // Handle successful login
       setMessage('Login successful.');

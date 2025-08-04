@@ -1,11 +1,128 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Plus, Search, Filter, Edit3, Trash2, Eye, Heart, Phone, Mail,
   Building, Home, MapPin, Bed, Bath, Square, Calendar, DollarSign,
   TrendingUp, Users, Star, BarChart3, Settings, LogOut, Bell,
   Upload, X, Check, AlertCircle, Camera, Save, MoreHorizontal,
-  Grid3X3, List, SortAsc, SortDesc, RefreshCw
+  Grid3X3, List, SortAsc, SortDesc, RefreshCw, Loader
 } from 'lucide-react';
+
+// API Service Layer - Updated for proper backend communication
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+class ApiService {
+  static async request(endpoint, options = {}) {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const config = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    };
+
+    // Add auth token if available
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    try {
+      const response = await fetch(url, config);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.data || data; // Handle both {data: {...}} and direct response formats
+    } catch (error) {
+      console.error('API request failed:', error);
+      throw error;
+    }
+  }
+
+  // Properties API - Updated endpoints
+  static async getProperties(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    const response = await this.request(`/properties${queryString ? `?${queryString}` : ''}`);
+    return response.properties || response; // Handle both formats
+  }
+
+  static async getProperty(id) {
+    const response = await this.request(`/properties/${id}`);
+    return response.property || response; // Handle both formats
+  }
+
+  static async createProperty(propertyData) {
+    const response = await this.request('/properties', {
+      method: 'POST',
+      body: JSON.stringify(propertyData),
+    });
+    return response.property || response; // Handle both formats
+  }
+
+  static async updateProperty(id, propertyData) {
+    const response = await this.request(`/properties/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(propertyData),
+    });
+    return response.property || response; // Handle both formats
+  }
+
+  static async deleteProperty(id) {
+    return this.request(`/properties/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Agent/Profile API - Updated endpoints
+  static async getAgentProfile() {
+    const response = await this.request('/agents/profile');
+    return response.agent || response; // Handle both formats
+  }
+
+  static async updateAgentProfile(profileData) {
+    const response = await this.request('/agents/profile', {
+      method: 'PUT',
+      body: JSON.stringify(profileData),
+    });
+    return response.agent || response; // Handle both formats
+  }
+
+  // Analytics API - Updated endpoints
+  static async getAnalytics() {
+    const response = await this.request('/agents/analytics');
+    return response.analytics || response; // Handle both formats
+  }
+
+  // Image upload API - Updated endpoint
+  static async uploadImages(files) {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append('images', file);
+    });
+
+    const response = await this.request('/upload/properties/images', {
+      method: 'POST',
+      headers: {}, // Let browser set content-type for FormData
+      body: formData,
+    });
+    return response.imageUrls || response.urls || []; // Handle both formats
+  }
+
+  // Additional agent-specific endpoints
+  static async getAgentProperties(agentId) {
+    const response = await this.request(`/agents/${agentId}/properties`);
+    return response.properties || response;
+  }
+
+  static async getAgentStats(agentId) {
+    const response = await this.request(`/agents/${agentId}/stats`);
+    return response.stats || response;
+  }
+}
 
 const AgentDashboard = () => {
   // State management
@@ -21,6 +138,12 @@ const AgentDashboard = () => {
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [showPropertyDetails, setShowPropertyDetails] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+
+  // Loading and error states
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [agentData, setAgentData] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
 
   // Form state for adding/editing properties
   const [propertyForm, setPropertyForm] = useState({
@@ -40,21 +163,49 @@ const AgentDashboard = () => {
     status: 'active'
   });
 
-  // Sample agent data
-  const agentData = {
-    name: 'Sarah Johnson',
-    email: 'sarah@realtypro.ng',
-    phone: '+234-802-567-8901',
-    rating: 4.8,
-    totalProperties: 24,
-    activeListing: 18,
-    sold: 32,
-    revenue: '₦125.5M',
-    avatar: '/api/placeholder/80/80'
+  // Image upload state
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+
+  // Load initial data
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  const loadInitialData = async () => {
+    setLoading(true);
+    try {
+      const [propertiesData, agentProfile] = await Promise.all([
+        ApiService.getProperties(),
+        ApiService.getAgentProfile(),
+      ]);
+
+      setProperties(propertiesData.properties || propertiesData);
+      setAgentData(agentProfile);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load dashboard data');
+      console.error('Load initial data error:', err);
+      // Fallback to sample data if API fails
+      loadSampleData();
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Sample properties data
-  useEffect(() => {
+  const loadSampleData = () => {
+    const sampleAgentData = {
+      name: 'Sarah Johnson',
+      email: 'sarah@realtypro.ng',
+      phone: '+234-802-567-8901',
+      rating: 4.8,
+      totalProperties: 24,
+      activeListing: 18,
+      sold: 32,
+      revenue: '₦125.5M',
+      avatar: '/api/placeholder/80/80'
+    };
+
     const sampleProperties = [
       {
         id: '1',
@@ -99,33 +250,28 @@ const AgentDashboard = () => {
         inquiries: 8,
         dateAdded: '2024-01-10',
         lastUpdated: '2024-01-18'
-      },
-      {
-        id: '3',
-        title: '3-Bedroom Terraced House in Ikeja GRA',
-        description: 'Spacious family home with garden and garage.',
-        propertyType: 'house',
-        address: 'Ikeja GRA, Lagos',
-        area: 'Ikeja',
-        state: 'Lagos',
-        price: 55000000,
-        currency: '₦',
-        bedrooms: 3,
-        bathrooms: 4,
-        size: '280sqm',
-        images: ['/api/placeholder/400/300', '/api/placeholder/400/300'],
-        features: ['Garden', 'Garage', 'Security'],
-        status: 'sold',
-        views: 156,
-        favorites: 25,
-        inquiries: 15,
-        dateAdded: '2023-12-20',
-        lastUpdated: '2024-01-05'
       }
     ];
+
+    setAgentData(sampleAgentData);
     setProperties(sampleProperties);
-    setFilteredProperties(sampleProperties);
+  };
+
+  // Load analytics data
+  const loadAnalytics = useCallback(async () => {
+    try {
+      const analyticsData = await ApiService.getAnalytics();
+      setAnalytics(analyticsData);
+    } catch (err) {
+      console.error('Failed to load analytics:', err);
+    }
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'analytics') {
+      loadAnalytics();
+    }
+  }, [activeTab, loadAnalytics]);
 
   // Filter and search properties
   useEffect(() => {
@@ -145,8 +291,8 @@ const AgentDashboard = () => {
           bValue = b.price;
           break;
         case 'views':
-          aValue = a.views;
-          bValue = b.views;
+          aValue = a.views || 0;
+          bValue = b.views || 0;
           break;
         case 'date':
         default:
@@ -171,23 +317,49 @@ const AgentDashboard = () => {
     return `₦${amount.toLocaleString()}`;
   };
 
-  const handleAddProperty = () => {
-    const newProperty = {
-      ...propertyForm,
-      id: Date.now().toString(),
-      price: parseInt(propertyForm.price),
-      bedrooms: parseInt(propertyForm.bedrooms),
-      bathrooms: parseInt(propertyForm.bathrooms),
-      views: 0,
-      favorites: 0,
-      inquiries: 0,
-      dateAdded: new Date().toISOString().split('T')[0],
-      lastUpdated: new Date().toISOString().split('T')[0]
-    };
-    
-    setProperties([newProperty, ...properties]);
-    setShowAddProperty(false);
-    resetForm();
+  const handleImageUpload = async (files) => {
+    if (!files || files.length === 0) return [];
+
+    setUploadingImages(true);
+    try {
+      const uploadResult = await ApiService.uploadImages(Array.from(files));
+      return uploadResult.imageUrls || [];
+    } catch (err) {
+      setError('Failed to upload images');
+      return [];
+    } finally {
+      setUploadingImages(false);
+    }
+  };
+
+  const handleAddProperty = async () => {
+    setLoading(true);
+    try {
+      // Upload images first if any
+      let imageUrls = propertyForm.images;
+      if (selectedFiles.length > 0) {
+        imageUrls = await handleImageUpload(selectedFiles);
+      }
+
+      const propertyData = {
+        ...propertyForm,
+        price: parseInt(propertyForm.price),
+        bedrooms: parseInt(propertyForm.bedrooms),
+        bathrooms: parseInt(propertyForm.bathrooms),
+        images: imageUrls,
+      };
+
+      const newProperty = await ApiService.createProperty(propertyData);
+      setProperties([newProperty, ...properties]);
+      setShowAddProperty(false);
+      resetForm();
+      setError(null);
+    } catch (err) {
+      setError('Failed to add property');
+      console.error('Add property error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEditProperty = (property) => {
@@ -197,21 +369,54 @@ const AgentDashboard = () => {
     setShowAddProperty(true);
   };
 
-  const handleUpdateProperty = () => {
-    const updatedProperties = properties.map(p => 
-      p.id === selectedProperty.id 
-        ? { ...propertyForm, lastUpdated: new Date().toISOString().split('T')[0] }
-        : p
-    );
-    setProperties(updatedProperties);
-    setShowAddProperty(false);
-    setIsEditing(false);
-    resetForm();
+  const handleUpdateProperty = async () => {
+    setLoading(true);
+    try {
+      // Upload new images if any
+      let imageUrls = propertyForm.images;
+      if (selectedFiles.length > 0) {
+        const newImageUrls = await handleImageUpload(selectedFiles);
+        imageUrls = [...imageUrls, ...newImageUrls];
+      }
+
+      const propertyData = {
+        ...propertyForm,
+        price: parseInt(propertyForm.price),
+        bedrooms: parseInt(propertyForm.bedrooms),
+        bathrooms: parseInt(propertyForm.bathrooms),
+        images: imageUrls,
+      };
+
+      const updatedProperty = await ApiService.updateProperty(selectedProperty.id, propertyData);
+      const updatedProperties = properties.map(p => 
+        p.id === selectedProperty.id ? updatedProperty : p
+      );
+      setProperties(updatedProperties);
+      setShowAddProperty(false);
+      setIsEditing(false);
+      resetForm();
+      setError(null);
+    } catch (err) {
+      setError('Failed to update property');
+      console.error('Update property error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDeleteProperty = (id) => {
-    if (window.confirm('Are you sure you want to delete this property?')) {
+  const handleDeleteProperty = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this property?')) return;
+
+    setLoading(true);
+    try {
+      await ApiService.deleteProperty(id);
       setProperties(properties.filter(p => p.id !== id));
+      setError(null);
+    } catch (err) {
+      setError('Failed to delete property');
+      console.error('Delete property error:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -233,6 +438,11 @@ const AgentDashboard = () => {
       status: 'active'
     });
     setSelectedProperty(null);
+    setSelectedFiles([]);
+  };
+
+  const handleRefresh = () => {
+    loadInitialData();
   };
 
   const getStatusColor = (status) => {
@@ -245,6 +455,27 @@ const AgentDashboard = () => {
     }
   };
 
+  // Error Alert Component
+  const ErrorAlert = ({ message, onClose }) => (
+    <div className="fixed top-4 right-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-3 shadow-lg z-50">
+      <AlertCircle className="h-5 w-5 text-red-600" />
+      <span className="text-red-800">{message}</span>
+      <button onClick={onClose} className="text-red-600 hover:text-red-800">
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
+
+  // Loading Overlay Component
+  const LoadingOverlay = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 flex items-center space-x-3 shadow-lg">
+        <Loader className="h-6 w-6 animate-spin text-blue-600" />
+        <span className="text-gray-900">Loading...</span>
+      </div>
+    </div>
+  );
+
   // Navigation Sidebar
   const Sidebar = () => (
     <div className="w-64 bg-white shadow-lg h-screen fixed left-0 top-0 z-40">
@@ -254,7 +485,7 @@ const AgentDashboard = () => {
             <Building className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="font-bold text-xl text-gray-900">RealtyPro</h1>
+            <h1 className="font-bold text-xl text-gray-900">HomeSphere</h1>
             <p className="text-xs text-gray-500">Agent Dashboard</p>
           </div>
         </div>
@@ -302,6 +533,14 @@ const AgentDashboard = () => {
         </div>
         
         <div className="flex items-center space-x-4">
+          <button 
+            onClick={handleRefresh}
+            disabled={loading}
+            className="p-2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+
           <button className="relative p-2 text-gray-400 hover:text-gray-600 transition-colors">
             <Bell className="h-6 w-6" />
             <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">3</span>
@@ -309,12 +548,12 @@ const AgentDashboard = () => {
           
           <div className="flex items-center space-x-3">
             <img 
-              src={agentData.avatar} 
-              alt={agentData.name}
+              src={agentData?.avatar || '/api/placeholder/40/40'} 
+              alt={agentData?.name || 'Agent'}
               className="w-10 h-10 rounded-full object-cover"
             />
             <div>
-              <div className="font-medium text-gray-900">{agentData.name}</div>
+              <div className="font-medium text-gray-900">{agentData?.name || 'Loading...'}</div>
               <div className="text-sm text-gray-500">Agent</div>
             </div>
           </div>
@@ -329,28 +568,28 @@ const AgentDashboard = () => {
       {[
         { 
           label: 'Total Properties', 
-          value: agentData.totalProperties, 
+          value: agentData?.totalProperties || properties.length, 
           icon: Building, 
           color: 'blue',
           change: '+12%'
         },
         { 
           label: 'Active Listings', 
-          value: agentData.activeListing, 
+          value: agentData?.activeListing || properties.filter(p => p.status === 'active').length, 
           icon: Home, 
           color: 'green',
           change: '+8%'
         },
         { 
           label: 'Properties Sold', 
-          value: agentData.sold, 
+          value: agentData?.sold || properties.filter(p => p.status === 'sold').length, 
           icon: TrendingUp, 
           color: 'purple',
           change: '+23%'
         },
         { 
           label: 'Total Revenue', 
-          value: agentData.revenue, 
+          value: agentData?.revenue || '₦0', 
           icon: DollarSign, 
           color: 'yellow',
           change: '+15%'
@@ -527,9 +766,25 @@ const AgentDashboard = () => {
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
               <Camera className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600 mb-2">Drag and drop images here, or click to browse</p>
-              <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                Choose Files
-              </button>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => setSelectedFiles(Array.from(e.target.files))}
+                className="hidden"
+                id="image-upload"
+              />
+              <label
+                htmlFor="image-upload"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer inline-block"
+              >
+                {uploadingImages ? 'Uploading...' : 'Choose Files'}
+              </label>
+              {selectedFiles.length > 0 && (
+                <p className="text-sm text-gray-600 mt-2">
+                  {selectedFiles.length} file(s) selected
+                </p>
+              )}
             </div>
           </div>
 
@@ -539,502 +794,117 @@ const AgentDashboard = () => {
             <select
               value={propertyForm.status}
               onChange={(e) => setPropertyForm({...propertyForm, status: e.target.value})}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="active">Active</option>
               <option value="pending">Pending</option>
+              <option value="sold">Sold</option>
               <option value="inactive">Inactive</option>
             </select>
           </div>
         </div>
 
-        <div className="flex items-center justify-end space-x-4 p-6 border-t border-gray-200">
-          <button
-            onClick={() => {
-              setShowAddProperty(false);
-              setIsEditing(false);
-              resetForm();
-            }}
-            className="px-6 py-3 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
+        <div className="flex justify-end p-6 border-t border-gray-200">
           <button
             onClick={isEditing ? handleUpdateProperty : handleAddProperty}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
           >
-            <Save className="h-4 w-4" />
-            <span>{isEditing ? 'Update Property' : 'Add Property'}</span>
+            {isEditing ? 'Update Property' : 'Add Property'}
           </button>
         </div>
       </div>
     </div>
   );
 
-  // Property Card Component
-  const PropertyCard = ({ property }) => (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-300">
-      <div className="relative">
-        <img 
-          src={property.images[0]} 
-          alt={property.title}
-          className="w-full h-48 object-cover"
-        />
-        
-        <div className="absolute top-3 left-3">
-          <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(property.status)}`}>
-            {property.status}
-          </span>
-        </div>
-
-        <div className="absolute top-3 right-3">
-          <div className="bg-black/70 backdrop-blur-sm text-white px-3 py-1 rounded-full">
-            <span className="text-sm font-bold">{formatPrice(property.price)}</span>
-          </div>
-        </div>
-
-        <div className="absolute bottom-3 right-3">
-          <div className="flex items-center space-x-1">
-            <button
-              onClick={() => handleEditProperty(property)}
-              className="p-2 bg-white/90 backdrop-blur-sm text-gray-600 rounded-full shadow-lg hover:bg-blue-500 hover:text-white transition-all"
-            >
-              <Edit3 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => handleDeleteProperty(property.id)}
-              className="p-2 bg-white/90 backdrop-blur-sm text-gray-600 rounded-full shadow-lg hover:bg-red-500 hover:text-white transition-all"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="p-6">
-        <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2">{property.title}</h3>
-        
-        <div className="flex items-center text-gray-600 mb-3">
-          <MapPin className="h-4 w-4 mr-2" />
-          <span className="text-sm">{property.address}</span>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4 mb-4">
-          <div className="text-center">
-            <Bed className="h-4 w-4 mx-auto mb-1 text-gray-400" />
-            <div className="text-sm font-semibold text-gray-900">{property.bedrooms}</div>
-          </div>
-          <div className="text-center">
-            <Bath className="h-4 w-4 mx-auto mb-1 text-gray-400" />
-            <div className="text-sm font-semibold text-gray-900">{property.bathrooms}</div>
-          </div>
-          <div className="text-center">
-            <Square className="h-4 w-4 mx-auto mb-1 text-gray-400" />
-            <div className="text-sm font-semibold text-gray-900">{property.size}</div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between text-sm text-gray-500 pt-4 border-t border-gray-100">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-1">
-              <Eye className="h-3 w-3" />
-              <span>{property.views}</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <Heart className="h-3 w-3" />
-              <span>{property.favorites}</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <Mail className="h-3 w-3" />
-              <span>{property.inquiries}</span>
-            </div>
-          </div>
-          <div className="text-xs">
-            Added: {new Date(property.dateAdded).toLocaleDateString()}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Properties List View
-  const PropertiesListView = () => (
-    <div className="space-y-4">
-      {filteredProperties.map((property) => (
-        <div key={property.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center space-x-6">
-            <img 
-              src={property.images[0]} 
-              alt={property.title}
-              className="w-24 h-24 rounded-lg object-cover flex-shrink-0"
-            />
-            
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 truncate">{property.title}</h3>
-                  <div className="flex items-center text-gray-600 mt-1">
-                    <MapPin className="h-4 w-4 mr-1" />
-                    <span className="text-sm">{property.address}</span>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <span className="text-xl font-bold text-gray-900">{formatPrice(property.price)}</span>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(property.status)}`}>
-                    {property.status}
-                  </span>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-6 text-sm text-gray-600">
-                  <span>{property.bedrooms} beds</span>
-                  <span>{property.bathrooms} baths</span>
-                  <span>{property.size}</span>
-                  <span>{property.views} views</span>
-                  <span>{property.inquiries} inquiries</span>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleEditProperty(property)}
-                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+  // Main render function
+  return (
+    <div className="flex min-h-screen bg-gray-100">
+      <Sidebar />
+      <div className="flex-1 ml-64">
+        <Header />
+        <main className="p-8">
+          {activeTab === 'properties' && (
+            <>
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex space-x-4">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search properties..."
+                    className="px-4 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg"
                   >
-                    <Edit3 className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteProperty(property.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="pending">Pending</option>
+                    <option value="sold">Sold</option>
+                  </select>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
-  // Properties Tab Content
-  const PropertiesTab = () => (
-    <div className="ml-64 p-8">
-      <Header />
-      
-      <div className="mt-8">
-        <StatsCards />
-
-        {/* Filters and Controls */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-            <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search properties..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full sm:w-64"
-                />
-              </div>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="pending">Pending</option>
-                <option value="sold">Sold</option>
-                <option value="inactive">Inactive</option>
-              </select>
-
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="date">Sort by Date</option>
-                <option value="price">Sort by Price</option>
-                <option value="views">Sort by Views</option>
-              </select>
-
-              <button
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                {sortOrder === 'asc' ? <SortAsc className="h-5 w-5" /> : <SortDesc className="h-5 w-5" />}
-              </button>
-            </div>
-
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded-lg transition-colors ${
-                    viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'
-                  }`}
+                  onClick={() => setShowAddProperty(true)}
+                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
                 >
-                  <Grid3X3 className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-lg transition-colors ${
-                    viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'
-                  }`}
-                >
-                  <List className="h-5 w-5" />
+                  <Plus className="inline mr-2" /> Add Property
                 </button>
               </div>
 
-              <button
-                onClick={() => setShowAddProperty(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add Property</span>
-              </button>
-            </div>
-          </div>
-        </div>
+              <StatsCards />
 
-        {/* Properties Grid/List */}
-        {filteredProperties.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-            <Building className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-900 mb-2">No properties found</h3>
-            <p className="text-gray-600 mb-6">Start by adding your first property listing.</p>
-            <button
-              onClick={() => setShowAddProperty(true)}
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Add Your First Property
-            </button>
-          </div>
-        ) : (
-          <>
-            {viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredProperties.map((property) => (
-                  <PropertyCard key={property.id} property={property} />
-                ))}
-              </div>
-            ) : (
-              <PropertiesListView />
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Property Form Modal */}
-      {showAddProperty && <PropertyForm />}
-    </div>
-  );
-
-  // Analytics Tab Content
-  const AnalyticsTab = () => (
-    <div className="ml-64 p-8">
-      <Header />
-      
-      <div className="mt-8">
-        <StatsCards />
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Performance Chart */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Monthly Performance</h3>
-            <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-600">Performance chart would go here</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Property Views */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Top Performing Properties</h3>
-            <div className="space-y-4">
-              {filteredProperties.slice(0, 3).map((property, index) => (
-                <div key={property.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <span className="w-6 h-6 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center">
-                      {index + 1}
-                    </span>
-                    <div>
-                      <div className="font-medium text-gray-900 truncate max-w-48">{property.title}</div>
-                      <div className="text-sm text-gray-600">{property.views} views</div>
+                  <div key={property.id} className="bg-white rounded-xl shadow-sm border p-4">
+                    <img
+                      src={property.images[0] || '/api/placeholder/400/300'}
+                      alt={property.title}
+                      className="w-full h-48 object-cover rounded-lg mb-4"
+                    />
+                    <h3 className="text-lg font-semibold text-gray-800">{property.title}</h3>
+                    <p className="text-gray-600 text-sm mb-2">{property.address}</p>
+                    <p className="text-blue-600 font-bold mb-2">{formatPrice(property.price)}</p>
+                    <div className="flex justify-between text-sm text-gray-500 mb-4">
+                      <span>{property.bedrooms} Beds</span>
+                      <span>{property.bathrooms} Baths</span>
+                      <span>{property.size}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className={`text-xs font-medium px-2 py-1 rounded ${getStatusColor(property.status)}`}>
+                        {property.status}
+                      </span>
+                      <div className="flex space-x-2">
+                        <button onClick={() => handleEditProperty(property)}>
+                          <Edit3 className="h-5 w-5 text-blue-500 hover:text-blue-700" />
+                        </button>
+                        <button onClick={() => handleDeleteProperty(property.id)}>
+                          <Trash2 className="h-5 w-5 text-red-500 hover:text-red-700" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-bold text-gray-900">{formatPrice(property.price)}</div>
-                    <div className="text-sm text-gray-600">{property.inquiries} inquiries</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Activity</h3>
-          <div className="space-y-4">
-            {[
-              { action: 'New inquiry received', property: 'Luxury 4-Bedroom Duplex', time: '2 hours ago', type: 'inquiry' },
-              { action: 'Property viewed', property: '2-Bedroom Apartment in VI', time: '4 hours ago', type: 'view' },
-              { action: 'Property favorited', property: '3-Bedroom Terraced House', time: '6 hours ago', type: 'favorite' },
-              { action: 'Price updated', property: 'Luxury 4-Bedroom Duplex', time: '1 day ago', type: 'update' }
-            ].map((activity, index) => (
-              <div key={index} className="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  activity.type === 'inquiry' ? 'bg-blue-100 text-blue-600' :
-                  activity.type === 'view' ? 'bg-green-100 text-green-600' :
-                  activity.type === 'favorite' ? 'bg-red-100 text-red-600' :
-                  'bg-yellow-100 text-yellow-600'
-                }`}>
-                  {activity.type === 'inquiry' && <Mail className="h-5 w-5" />}
-                  {activity.type === 'view' && <Eye className="h-5 w-5" />}
-                  {activity.type === 'favorite' && <Heart className="h-5 w-5" />}
-                  {activity.type === 'update' && <Edit3 className="h-5 w-5" />}
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900">{activity.action}</div>
-                  <div className="text-sm text-gray-600">{activity.property}</div>
-                </div>
-                <div className="text-sm text-gray-500">{activity.time}</div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </>
+          )}
+
+          {activeTab === 'analytics' && (
+            <div className="text-gray-700">
+              <h2 className="text-xl font-bold mb-4">Analytics Overview</h2>
+              {/* Placeholder or actual analytics data rendering */}
+              <pre>{JSON.stringify(analytics, null, 2)}</pre>
+            </div>
+          )}
+
+          {/* More tabs like 'inquiries', 'profile', 'settings' can be added here */}
+        </main>
       </div>
-    </div>
-  );
 
-  // Profile Tab Content
-  const ProfileTab = () => (
-    <div className="ml-64 p-8">
-      <Header />
-      
-      <div className="mt-8">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-          <div className="flex items-center space-x-6 mb-8">
-            <div className="relative">
-              <img 
-                src={agentData.avatar} 
-                alt={agentData.name}
-                className="w-24 h-24 rounded-full object-cover"
-              />
-              <button className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors">
-                <Camera className="h-4 w-4" />
-              </button>
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">{agentData.name}</h2>
-              <p className="text-gray-600">{agentData.email}</p>
-              <div className="flex items-center space-x-1 mt-2">
-                <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                <span className="font-medium">{agentData.rating}</span>
-                <span className="text-gray-600">rating</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Contact Information</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-                  <input
-                    type="text"
-                    defaultValue={agentData.name}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                  <input
-                    type="email"
-                    defaultValue={agentData.email}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-                  <input
-                    type="tel"
-                    defaultValue={agentData.phone}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Professional Details</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">License Number</label>
-                  <input
-                    type="text"
-                    placeholder="Enter license number"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Years of Experience</label>
-                  <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    <option>1-2 years</option>
-                    <option>3-5 years</option>
-                    <option>6-10 years</option>
-                    <option>10+ years</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Specialization</label>
-                  <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    <option>Residential</option>
-                    <option>Commercial</option>
-                    <option>Luxury Properties</option>
-                    <option>Land & Development</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-8 pt-8 border-t border-gray-200">
-            <button className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
-              Save Changes
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Main Content Renderer
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'properties':
-        return <PropertiesTab />;
-      case 'analytics':
-        return <AnalyticsTab />;
-      case 'profile':
-        return <ProfileTab />;
-      default:
-        return <PropertiesTab />;
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar />
-      {renderTabContent()}
+      {showAddProperty && <PropertyForm />}
+      {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
+      {loading && <LoadingOverlay />}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getProfile } from '../api';
+import { authAPI } from '../api';
 
 export default function Profile({ token }) {
   const [profile, setProfile] = useState(null);
@@ -9,7 +9,7 @@ export default function Profile({ token }) {
     async function fetchProfile() {
       setMessage('');
       try {
-        const data = await getProfile(token);
+      const data = await authAPI.getProfile(token);
         if (data.error) {
           setMessage('Error: ' + data.error);
         } else {

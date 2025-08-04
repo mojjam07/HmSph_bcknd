@@ -3,7 +3,7 @@ import { ArrowLeft, User, Home, Shield } from 'lucide-react';
 import RoleSelection from './RoleSelection';
 import Input from '../common/Input';
 import Button from '../common/Button';
-import { register } from '../../api.js';
+import { register } from '../../api';
 
 const RegistrationForm = () => {
   const [step, setStep] = useState(1); // 1: role selection, 2: common info, 3: role-specific info, 4: review

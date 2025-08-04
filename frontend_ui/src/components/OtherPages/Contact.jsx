@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navigation from '../LandingPage/Navigation';
 import Footer from '../LandingPage/Footer';
 import { 
   MapPin, Phone, Mail, Clock, Send, CheckCircle,
-  MessageSquare, HeadphonesIcon, Building, Users
+  MessageSquare, Headphones, Building, Users,
+  AlertCircle, Loader
 } from 'lucide-react';
+import { apiRequest } from '../../api/utils.js';
 
 const ContactPage = ({ onLogin, token, user }) => {
   const [formData, setFormData] = useState({
@@ -17,35 +19,28 @@ const ContactPage = ({ onLogin, token, user }) => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
+  const [contactInfo, setContactInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+  // Fetch contact information from backend
+  useEffect(() => {
+    fetchContactInfo();
+  }, []);
+
+  const fetchContactInfo = async () => {
+    try {
+      const data = await apiRequest('/api/contact/info');
+      setContactInfo(data);
+    } catch (error) {
+      console.error('Error fetching contact info:', error);
+      setContactInfo(getDefaultContactInfo());
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    
-    // Simulate form submission
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setSubmitted(true);
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        subject: '',
-        message: '',
-        inquiryType: 'general'
-      });
-    }, 2000);
-  };
-
-  const contactInfo = [
+  const getDefaultContactInfo = () => [
     {
       icon: MapPin,
       title: "Visit Our Office",
@@ -88,19 +83,138 @@ const ContactPage = ({ onLogin, token, user }) => {
     }
   ];
 
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    // Clear error when user starts typing
+    if (error) setError('');
+  };
+
+  const validateForm = () => {
+    if (!formData.name.trim()) {
+      setError('Name is required');
+      return false;
+    }
+    if (!formData.email.trim()) {
+      setError('Email is required');
+      return false;
+    }
+    if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+    if (!formData.subject.trim()) {
+      setError('Subject is required');
+      return false;
+    }
+    if (!formData.message.trim()) {
+      setError('Message is required');
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      const data = await apiRequest('/api/contact/submit', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...formData,
+          userId: user?.id || null
+        })
+      });
+
+      setSubmitted(true);
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        subject: '',
+        message: '',
+        inquiryType: 'general'
+      });
+      
+      // Track contact form submission (if you have analytics)
+      if (window.gtag) {
+        window.gtag('event', 'contact_form_submit', {
+          event_category: 'engagement',
+          event_label: formData.inquiryType
+        });
+      }
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      setError(error.message || 'Failed to send message. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSupportAction = async (actionType) => {
+    try {
+      // Track support action
+      await fetch(`${API_BASE_URL}/analytics/track`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: JSON.stringify({
+          event: 'support_action_clicked',
+          data: { actionType, userId: user?.id || null }
+        })
+      });
+
+      // Handle different actions
+      switch (actionType) {
+        case 'chat':
+          // Open chat widget or redirect to chat page
+          window.open('/chat', '_blank');
+          break;
+        case 'phone':
+          window.location.href = 'tel:+2348031234567';
+          break;
+        case 'email':
+          window.location.href = 'mailto:support@homesphere.com';
+          break;
+        case 'meeting':
+          // Redirect to booking page
+          window.open('/book-meeting', '_blank');
+          break;
+        default:
+          break;
+      }
+    } catch (error) {
+      console.error('Error tracking support action:', error);
+    }
+  };
+
   const supportOptions = [
     {
       icon: MessageSquare,
       title: "Live Chat",
       description: "Get instant help from our support team",
       action: "Start Chat",
+      actionType: "chat",
       available: true
     },
     {
-      icon: HeadphonesIcon,
+      icon: Headphones,
       title: "Phone Support",
       description: "Speak directly with our experts",
       action: "Call Now",
+      actionType: "phone",
       available: true
     },
     {
@@ -108,6 +222,7 @@ const ContactPage = ({ onLogin, token, user }) => {
       title: "Email Support",
       description: "Send us detailed questions",
       action: "Send Email",
+      actionType: "email",
       available: true
     },
     {
@@ -115,6 +230,7 @@ const ContactPage = ({ onLogin, token, user }) => {
       title: "Office Visit",
       description: "Schedule an in-person meeting",
       action: "Book Meeting",
+      actionType: "meeting",
       available: true
     }
   ];
@@ -138,6 +254,17 @@ const ContactPage = ({ onLogin, token, user }) => {
     return colors[color] || colors.blue;
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading contact information...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation onShowRegistration={() => {}} onShowLogin={() => {}} token={token} user={user} />
@@ -158,7 +285,7 @@ const ContactPage = ({ onLogin, token, user }) => {
       <div className="py-16">
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 -mt-8">
-            {contactInfo.map((info, index) => (
+            {contactInfo?.map((info, index) => (
               <div key={index} className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow">
                 <div className={`p-3 rounded-2xl w-16 h-16 flex items-center justify-center mb-4 ${getColorClasses(info.color)}`}>
                   <info.icon className="h-8 w-8" />
@@ -200,7 +327,14 @@ const ContactPage = ({ onLogin, token, user }) => {
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <div onSubmit={handleSubmit} className="space-y-6">
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center">
+                      <AlertCircle className="h-5 w-5 text-red-600 mr-3 flex-shrink-0" />
+                      <p className="text-red-700 text-sm">{error}</p>
+                    </div>
+                  )}
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -296,7 +430,8 @@ const ContactPage = ({ onLogin, token, user }) => {
                   </div>
                   
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={handleSubmit}
                     disabled={isSubmitting}
                     className="w-full bg-blue-600 text-white py-3 px-6 rounded-xl hover:bg-blue-700 transition-colors font-medium flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -312,7 +447,7 @@ const ContactPage = ({ onLogin, token, user }) => {
                       </>
                     )}
                   </button>
-                </form>
+                </div>
               )}
             </div>
 
@@ -332,7 +467,10 @@ const ContactPage = ({ onLogin, token, user }) => {
                           <p className="text-gray-600 text-sm">{option.description}</p>
                         </div>
                       </div>
-                      <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                      <button 
+                        onClick={() => handleSupportAction(option.actionType)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                      >
                         {option.action}
                       </button>
                     </div>
@@ -347,7 +485,10 @@ const ContactPage = ({ onLogin, token, user }) => {
                     <MapPin className="h-12 w-12 text-blue-600 mx-auto mb-4" />
                     <h3 className="text-lg font-bold text-gray-900 mb-2">Find Us Here</h3>
                     <p className="text-gray-600">Victoria Island, Lagos</p>
-                    <button className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                    <button 
+                      onClick={() => window.open('https://maps.google.com/?q=Victoria+Island,+Lagos', '_blank')}
+                      className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                    >
                       Get Directions
                     </button>
                   </div>
@@ -424,7 +565,10 @@ const ContactPage = ({ onLogin, token, user }) => {
           
           <div className="text-center mt-8">
             <p className="text-gray-600 mb-4">Still have questions?</p>
-            <button className="bg-blue-600 text-white px-8 py-3 rounded-xl hover:bg-blue-700 transition-colors font-medium">
+            <button 
+              onClick={() => handleSupportAction('email')}
+              className="bg-blue-600 text-white px-8 py-3 rounded-xl hover:bg-blue-700 transition-colors font-medium"
+            >
               Contact Support
             </button>
           </div>
