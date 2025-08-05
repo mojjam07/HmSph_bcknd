@@ -7,8 +7,9 @@ import {
   Activity, BarChart3, PieChart, Clock, CheckCircle, XCircle,
   AlertCircle, Download, FileText, Globe, Zap, Award
 } from 'lucide-react';
+import LogoutButton from './common/LogoutButton';
 
-const AdminDashboard = () => {
+const AdminDashboard = ({ onLogout }) => {
   const [activeView, setActiveView] = useState('dashboard');
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [selectedListing, setSelectedListing] = useState(null);

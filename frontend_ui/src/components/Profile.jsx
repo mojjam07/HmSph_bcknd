@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { authAPI } from '../api';
+import LogoutButton from './common/LogoutButton';
 
-export default function Profile({ token }) {
+export default function Profile({ token, onLogout }) {
   const [profile, setProfile] = useState(null);
   const [message, setMessage] = useState('');
 
@@ -38,7 +39,10 @@ export default function Profile({ token }) {
 
   return (
     <div className="profile-container">
-      <h2 className="profile-title">Profile</h2>
+      <div className="profile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2 className="profile-title">Profile</h2>
+        <LogoutButton onLogout={onLogout} />
+      </div>
       <p className="profile-item"><strong>Email:</strong> {profile.email}</p>
       <p className="profile-item"><strong>First Name:</strong> {profile.firstName}</p>
       <p className="profile-item"><strong>Last Name:</strong> {profile.lastName}</p>
