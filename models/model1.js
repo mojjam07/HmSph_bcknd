@@ -54,7 +54,7 @@ userId: {
     type: DataTypes.JSONB
   },
   savedListings: {
-    type: DataTypes.ARRAY(DataTypes.INTEGER) // Assuming Listing IDs are integers
+    type: DataTypes.ARRAY(DataTypes.STRING) // Listing IDs are strings
   },
   searchHistory: {
     type: DataTypes.JSONB

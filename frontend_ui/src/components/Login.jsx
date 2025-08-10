@@ -1,21 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, LogIn, AlertCircle, CheckCircle } from 'lucide-react';
-
-// Mock navigate and authAPI for demo
-const useNavigate = () => ({ navigate: (path) => console.log(`Navigate to: ${path}`) });
-const authAPI = {
-  login: async (data) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    if (data.email === 'error@test.com') throw new Error('Invalid credentials');
-    return { 
-      token: 'demo-token', 
-      user: { 
-        role: data.email.includes('admin') ? 'admin' : data.email.includes('agent') ? 'agent' : 'user',
-        name: 'Demo User'
-      } 
-    };
-  }
-};
+import { useAuth } from '../context/AuthContext';
 
 // Enhanced Input Component
 const Input = ({ label, name, type, placeholder, value, onChange, required, error, icon: Icon, className = "" }) => {
@@ -108,7 +94,7 @@ const Button = ({ children, type = "button", disabled, onClick, className = "" }
   );
 };
 
-export default function Login({ onLogin = () => {} }) {
+export default function Login() {
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -118,6 +104,7 @@ export default function Login({ onLogin = () => {} }) {
   const [errors, setErrors] = useState({});
   const [isVisible, setIsVisible] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   useEffect(() => {
     setIsVisible(true);
@@ -164,26 +151,25 @@ export default function Login({ onLogin = () => {} }) {
     setIsLoading(true);
     
     try {
-      const loginData = {
-        email: formData.email,
-        password: formData.password
-      };
+      const result = await login(formData.email, formData.password);
       
-      const result = await authAPI.login(loginData);
-      
-      setMessage('Login successful! Redirecting...');
-      onLogin(result.token, result.user);
-      
-      // Simulate navigation
-      setTimeout(() => {
-        if (result.user.role === 'admin') {
-          navigate('/admin');
-        } else if (result.user.role === 'agent') {
-          navigate('/agent');
-        } else {
-          navigate('/profile');
-        }
-      }, 1500);
+      if (result.success) {
+        setMessage('Login successful! Redirecting...');
+        
+        // Navigate based on user role
+        setTimeout(() => {
+          const userRole = result.user?.role || 'user';
+          if (userRole === 'admin') {
+            navigate('/admin');
+          } else if (userRole === 'agent') {
+            navigate('/agent');
+          } else {
+            navigate('/profile');
+          }
+        }, 1500);
+      } else {
+        setMessage(`Error: ${result.error}`);
+      }
     } catch (err) {
       const errorMessage = err.message || 'Login failed. Please try again.';
       setMessage(`Error: ${errorMessage}`);
@@ -224,8 +210,7 @@ export default function Login({ onLogin = () => {} }) {
               <p className="text-sm sm:text-base text-gray-300">Sign in to your account</p>
             </div>
 
-            {/* Form - responsive spacing */}
-            <div className="space-y-4 sm:space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               <Input
                 label="Email Address"
                 name="email"
@@ -253,7 +238,6 @@ export default function Login({ onLogin = () => {} }) {
               <Button 
                 type="submit" 
                 disabled={isLoading}
-                onClick={handleSubmit}
                 className="w-full py-3 sm:py-4 px-4 sm:px-6 rounded-lg sm:rounded-xl font-semibold text-sm sm:text-base text-gray-900 shadow-lg transition-all duration-300 mt-6"
               >
                 {isLoading ? (
@@ -268,7 +252,7 @@ export default function Login({ onLogin = () => {} }) {
                   </div>
                 )}
               </Button>
-            </div>
+            </form>
 
             {/* Message Display - responsive text and padding */}
             {message && (
@@ -287,17 +271,6 @@ export default function Login({ onLogin = () => {} }) {
                 </div>
               </div>
             )}
-
-            {/* Demo credentials - responsive text and spacing */}
-            <div className="mt-6 sm:mt-8 p-3 sm:p-4 bg-black/20 rounded-lg sm:rounded-xl border border-white/10">
-              <p className="text-xs sm:text-sm text-gray-400 mb-2 font-medium">Demo credentials:</p>
-              <div className="text-xs sm:text-sm text-gray-300 space-y-1">
-                <p>• admin@test.com (Admin)</p>
-                <p>• agent@test.com (Agent)</p>
-                <p>• user@test.com (User)</p>
-                <p>• error@test.com (Test error)</p>
-              </div>
-            </div>
           </div>
         </div>
       </div>

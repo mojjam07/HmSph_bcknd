@@ -11,5 +11,4 @@ const getListings = async (req, res, next) => {
     next(error);
   }
 };
-
 module.exports = { getListings };

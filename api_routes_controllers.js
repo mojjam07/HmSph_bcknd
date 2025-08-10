@@ -15,7 +15,11 @@ const { sequelize } = require('./config/db'); // Import Sequelize instance
 // Route Imports
 const authRoutes = require('./routes/authRoutes');
 const listingRoutes = require('./routes/listingRoutes');
+const propertyRoutes = require('./routes/propertyRoutes');
+const favoriteRoutes = require('./routes/favoriteRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const reviewRoutes = require('./routes/reviewsRoutes');
+
 
 const app = express();
 
@@ -75,9 +79,15 @@ const storage = new CloudinaryStorage({
 const upload = multer({ storage: storage });
 
 // ==================== API ROUTES ====================
+const agentRoutes = require('./routes/agentRoutes');
+
 app.use('/api/auth', authRoutes);
 app.use('/api/listings', listingRoutes);
+app.use('/api/properties', propertyRoutes);
+app.use('/api/favorites', favoriteRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/agents', agentRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 // ==================== ERROR HANDLING ====================
 app.use((err, req, res, next) => {

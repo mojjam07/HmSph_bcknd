@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Building, Menu, X, LogOut, User, Settings
 } from 'lucide-react';
@@ -15,15 +15,17 @@ const Navigation = ({
   const [showUserMenu, setShowUserMenu] = useState(false);
   const location = useLocation();
 
+  const navigate = useNavigate();
+  
   const handleLoginClick = () => {
     if (token && user) {
       // User is already logged in, redirect to respective dashboard
       if (user.role === 'admin') {
-        window.location.href = '/admin';
+        navigate('/admin');
       } else if (user.role === 'agent') {
-        window.location.href = '/agent';
+        navigate('/agent');
       } else {
-        window.location.href = '/profile';
+        navigate('/profile');
       }
     } else {
       // User is not logged in, show login modal
@@ -35,6 +37,7 @@ const Navigation = ({
     { path: '/', label: 'Home' },
     { path: '/properties', label: 'Properties' },
     { path: '/agents', label: 'Agents' },
+    { path: '/reviews', label: 'Reviews' },
     { path: '/about', label: 'About' },
     { path: '/contact', label: 'Contact' }
   ];
@@ -115,6 +118,7 @@ const Navigation = ({
                     <hr className="my-1" />
                     <button
                       onClick={() => {
+                        console.log('Logout button clicked');
                         setShowUserMenu(false);
                         onLogout();
                       }}

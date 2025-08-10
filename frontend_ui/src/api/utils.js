@@ -1,41 +1,78 @@
-// Utility function to handle API responses
+// Utility function to handle API responses with enhanced JSON parsing
 export async function handleResponse(response) {
-  const contentType = response.headers.get('content-type');
+  const contentType = response.headers.get('content-type') || '';
   let data;
   
   try {
-    if (contentType && contentType.indexOf('application/json') !== -1) {
-      data = await response.json();
+    // Handle empty responses gracefully
+    if (response.status === 204 || response.status === 201) {
+      return { success: true, message: 'Request completed successfully' };
+    }
+    
+    // Get raw response text first
+    const rawText = await response.text();
+    
+    if (!rawText.trim()) {
+      // Empty response but status is OK
+      if (response.ok) {
+        return [];
+      }
+      throw new Error('Empty response received');
+    }
+    
+    // Only attempt JSON parsing if content type indicates JSON or looks like JSON
+    const isJsonContent = contentType.includes('application/json') || 
+                         rawText.trim().startsWith('{') || 
+                         rawText.trim().startsWith('[');
+    
+    if (isJsonContent) {
+      try {
+        data = JSON.parse(rawText);
+      } catch (jsonError) {
+        // If JSON parsing fails, check if response is OK
+        if (response.ok) {
+          // For successful responses, return empty array/object instead of throwing
+          console.warn('Invalid JSON response, returning empty array:', {
+            status: response.status,
+            contentType,
+            rawText: rawText.substring(0, 100)
+          });
+          return [];
+        }
+        
+        // For error responses, provide meaningful error
+        throw new Error(`Invalid JSON response from server (status ${response.status})`);
+      }
     } else {
-      data = await response.text();
+      // Non-JSON response - return as text
+      data = rawText;
     }
   } catch (parseError) {
-    console.error('Error parsing response:', parseError);
-    data = { error: 'Failed to parse server response' };
+    console.error('Response parsing error:', parseError);
+    // Don't throw for parsing errors on successful responses
+    if (response.ok) {
+      return [];
+    }
+    throw new Error(`Failed to parse server response: ${parseError.message}`);
   }
   
   if (!response.ok) {
-    // Handle different types of error responses
-    let errorMessage = 'Unknown error';
+    // Handle HTTP errors
+    let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
     
-    if (data && typeof data === 'object' && data.error) {
-      errorMessage = data.error;
-    } else if (data && typeof data === 'object' && data.message) {
-      errorMessage = data.message;
-    } else if (typeof data === 'string') {
+    if (data && typeof data === 'object') {
+      if (data.error) errorMessage = data.error;
+      else if (data.message) errorMessage = data.message;
+      else if (data.details) errorMessage = data.details;
+    } else if (typeof data === 'string' && data.trim()) {
       errorMessage = data;
-    } else if (response.statusText) {
-      errorMessage = response.statusText;
     }
     
-    // Add status code context for debugging
-    if (response.status === 401) {
-      errorMessage = errorMessage === 'Unauthorized' ? 'Invalid email or password' : errorMessage;
-    } else if (response.status === 500) {
-      errorMessage = 'Server error. Please try again later.';
-    }
-    
-    throw new Error(errorMessage);
+    const error = new Error(errorMessage);
+    error.status = response.status;
+    error.statusText = response.statusText;
+    error.response = data;
+    throw error;
   }
   
   return data;
